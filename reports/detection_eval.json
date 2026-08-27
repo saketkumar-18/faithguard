@@ -1,0 +1,122 @@
+{
+  "model": "cross-encoder/nli-deberta-v3-small",
+  "n_train": 450,
+  "n_test": 450,
+  "train_metrics": {
+    "model_type": "HistGradientBoostingClassifier",
+    "feature_names": [
+      "n_claims",
+      "mean_best_entail",
+      "min_best_entail",
+      "p25_best_entail",
+      "frac_supported",
+      "frac_contradicted",
+      "mean_mean_entail",
+      "max_contradiction",
+      "frac_hedged",
+      "top1_passage_coverage",
+      "answer_passage_overlap",
+      "answer_number_overlap",
+      "question_answer_overlap",
+      "answer_len_log",
+      "claims_per_100_chars"
+    ],
+    "n_train": 450,
+    "decision_threshold": 0.4999999999999999,
+    "val_f1_at_tuned_threshold": 0.918918918918919,
+    "train_f1": 1.0
+  },
+  "test_classifier": {
+    "n": 450,
+    "threshold": 0.5,
+    "accuracy": 0.8555555555555555,
+    "precision": 0.9304029304029304,
+    "recall": 0.8466666666666667,
+    "f1": 0.8865619546247818,
+    "auc": 0.9475333333333333,
+    "confusion": {
+      "tn": 131,
+      "fp": 19,
+      "fn": 46,
+      "tp": 254
+    }
+  },
+  "test_rule_fallback": {
+    "n": 450,
+    "threshold": 0.5,
+    "accuracy": 0.6155555555555555,
+    "precision": 0.6615776081424937,
+    "recall": 0.8666666666666667,
+    "f1": 0.7503607503607503,
+    "auc": 0.5488,
+    "confusion": {
+      "tn": 17,
+      "fp": 133,
+      "fn": 40,
+      "tp": 260
+    }
+  },
+  "feature_importance": [
+    {
+      "feature": "answer_passage_overlap",
+      "coef": 0.16044444444444442
+    },
+    {
+      "feature": "min_best_entail",
+      "coef": 0.11466666666666663
+    },
+    {
+      "feature": "answer_len_log",
+      "coef": 0.0933333333333333
+    },
+    {
+      "feature": "mean_best_entail",
+      "coef": -0.01155555555555563
+    },
+    {
+      "feature": "answer_number_overlap",
+      "coef": 0.007111111111111068
+    },
+    {
+      "feature": "max_contradiction",
+      "coef": 0.004888888888888854
+    },
+    {
+      "feature": "claims_per_100_chars",
+      "coef": 0.004444444444444385
+    },
+    {
+      "feature": "p25_best_entail",
+      "coef": -0.0031111111111111313
+    },
+    {
+      "feature": "mean_mean_entail",
+      "coef": 0.002666666666666617
+    },
+    {
+      "feature": "n_claims",
+      "coef": -0.001333333333333364
+    },
+    {
+      "feature": "top1_passage_coverage",
+      "coef": -0.001333333333333342
+    },
+    {
+      "feature": "frac_contradicted",
+      "coef": -0.0004444444444444473
+    },
+    {
+      "feature": "question_answer_overlap",
+      "coef": 0.0004444444444443807
+    },
+    {
+      "feature": "frac_supported",
+      "coef": 0.0
+    },
+    {
+      "feature": "frac_hedged",
+      "coef": 0.0
+    }
+  ],
+  "train_time_s": 317.5
+}

@@ -1,0 +1,40 @@
+# FaithGuard — production compose
+# Usage:
+#   cp .env.example .env   # then edit secrets
+#   docker compose up -d
+services:
+  faithguard:
+    build: .
+    image: faithguard:latest
+    ports:
+      - "${FG_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      # sane production defaults (override in .env)
+      FG_LOG_LEVEL: ${FG_LOG_LEVEL:-INFO}
+      FG_RATE_LIMIT: ${FG_RATE_LIMIT:-60}
+      FG_RATE_WINDOW_S: ${FG_RATE_WINDOW_S:-60}
+      HF_HOME: /models-cache
+    volumes:
+      # persist downloaded HF models across restarts/redeploys
+      - model-cache:/models-cache
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health',timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s   # first boot downloads models
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  model-cache:

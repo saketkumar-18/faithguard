@@ -126,6 +126,64 @@ curl -s localhost:8000/detect -H 'Content-Type: application/json' \
 | `FG_MAX_MITIGATION_ROUNDS` | 2 | correction rounds before abstention |
 | `FG_UNSUPPORTED_T` | 0.5 | claim entailment threshold |
 
+## Production deployment
+
+FaithGuard ships production-hardened. The same image runs in local dev and in
+the cloud — the difference is a few environment variables.
+
+### Security & operations (set these before going public)
+
+| Variable | Purpose |
+|---|---|
+| `FG_API_KEY` | **Enable API-key auth.** Send it via the `x-api-key` header or as a Bearer token in the `Authorization` header. When unset, auth is OFF and the app logs a loud warning. `/health` and `/metrics` stay open for load balancers. |
+| `FG_RATE_LIMIT` | Max requests per window per key (e.g. `60`). Unset = no limit. |
+| `FG_RATE_WINDOW_S` | Rate-limit window in seconds (default `60`). |
+| `FG_LOG_LEVEL` | `DEBUG` / `INFO` / `WARNING` (default `INFO`). |
+
+Every request gets an `x-request-id` (echoed back in the response) and a
+structured access-log line. `GET /metrics` exposes Prometheus-style counters
+(requests, latency, mitigation/abstention/detection tallies).
+
+### Run with Docker
+
+```bash
+# simplest: compose (reads .env, persists models, restarts automatically)
+cp .env.example .env   # fill in FG_API_KEY + LLM key
+docker compose up -d
+docker compose logs -f
+
+# or manually:
+docker build -t faithguard .
+docker run -p 8000:8000 \
+  -e FG_API_KEY=*** \
+  -e FG_RATE_LIMIT=60 \
+  -e HERMES_CUSTOM_TOKENROUTER_API_KEY=*** \
+  -v faithguard-models:/models-cache \
+  faithguard
+```
+
+The image runs as a **non-root user**, has a health check, and shuts down
+gracefully (30s drain). Models download on first boot and persist in the
+`/models-cache` volume.
+
+### Deploy to Render
+
+`render.yaml` is included — connect the repo in Render and it builds the
+Dockerfile automatically. Add the env vars above in the dashboard (mark the
+API keys as secret).
+
+### Operational notes
+
+- **Single worker.** The NLI + embedding models live in-process; keep
+  `--workers 1` and scale horizontally (multiple instances) if you need more
+  throughput. The rate limiter is per-instance (in-memory); use Redis if you
+  scale out and need a global budget.
+- **LLM degradation.** If the generation endpoint is down, `/ask` returns 502
+  but `/detect` (detection-only, no LLM) keeps working — you can still score
+  answers from another generator.
+- **Cold start.** First boot downloads ~200 MB of models. The baked-in
+  embedding cache means the corpus is not re-embedded.
+
 ## Tests
 
 ```bash

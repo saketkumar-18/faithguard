@@ -3,7 +3,9 @@ __pycache__/
 *.pyc
 .pytest_cache/
 data/squad_dev.json
+data/feature_cache/
 models/*.pkl
-reports/
+!models/hallucination_classifier.pkl
+reports/*.ckpt.json
 *.egg-info/
 .env
