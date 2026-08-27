@@ -81,7 +81,12 @@ class LLMClient:
             raise requests.RequestException(f"server_error_{resp.status_code}")
         resp.raise_for_status()
         data = resp.json()
-        text = (data["choices"][0]["message"]["content"] or "").strip()
+        msg = data["choices"][0]["message"]
+        text = (msg.get("content") or "").strip()
+        # Reasoning models (e.g. Qwen3 with thinking enabled) may put the
+        # answer in reasoning_content and leave content empty.
+        if not text:
+            text = (msg.get("reasoning_content") or "").strip()
         if not text:
             raise requests.RequestException("empty_content")
         return LLMResponse(text=text, model=data.get("model", self.model),
@@ -100,6 +105,9 @@ class LLMClient:
             ],
             "temperature": self.temperature if temperature is None else temperature,
             "max_tokens": self.max_tokens,
+            # Qwen3 reasoning models put the answer in reasoning_content and
+            # leave content empty unless thinking is disabled.
+            "enable_thinking": False,
         }
 
         last_err = "unknown error"
