@@ -77,7 +77,12 @@ class NLIScorer:
             paths[f] = local or hf_hub_download(repo, f, local_files_only=True)
 
         self.tokenizer = Tokenizer.from_file(paths["tokenizer.json"])
-        self.tokenizer.enable_truncation(max_length=512)
+        # 128 tokens, not 512: claims are 1-2 sentences and the supporting
+        # passage content fits well within 128 tokens. DeBERTa attention
+        # memory scales as O(seq_len^2) per layer, so 512-token sequences
+        # spike ~600 MB peak on a 12-layer model — enough to OOM the 512 MB
+        # Render free tier. 128 tokens cuts that by ~16x.
+        self.tokenizer.enable_truncation(max_length=128)
         # pair padding is applied per-batch below (dynamic lengths)
 
         cfg = json.loads(Path(paths["config.json"]).read_text(encoding="utf-8"))
