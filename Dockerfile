@@ -24,12 +24,12 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 # --- bake the ML models into the image (no runtime download) ---------------
-# NLI cross-encoder (quantized int8 ONNX) + bge-small embedding model.
+# NLI cross-encoder (quantized int8 ONNX). The embedding model is NOT baked:
+# on the 512 MB free tier we run BM25-only retrieval (FG_USE_DENSE=0), so the
+# ~240 MB fastembed model is never loaded.
 RUN python -c "from huggingface_hub import hf_hub_download; \
 [hf_hub_download('Xenova/nli-deberta-v3-small', f) for f in \
- ['onnx/model_quantized.onnx', 'tokenizer.json', 'config.json']]" \
- && python -c "from fastembed import TextEmbedding; \
- m = TextEmbedding(model_name='BAAI/bge-small-en-v1.5'); list(m.embed(['warm']))"
+ ['onnx/model_quantized.onnx', 'tokenizer.json', 'config.json']]"
 
 COPY faithguard ./faithguard
 COPY scripts ./scripts

@@ -40,7 +40,7 @@ from .. import __version__
 from ..circuit_breaker import CircuitBreaker
 from ..config import DATA_DIR, MODELS_DIR, get_settings
 from ..detection.classifier import HallucinationClassifier
-from ..detection.nli import LazyNLIScorer, NLIScorer
+from ..detection.nli import NLIScorer
 from ..generation.llm import LLMClient
 from ..pipeline import GuardedRAGPipeline
 from ..retrieval.chunking import Chunker
@@ -74,7 +74,7 @@ class LoadCorpusRequest(BaseModel):
 class AppState:
     def __init__(self):
         self.settings = get_settings()
-        self.nli: LazyNLIScorer | NLIScorer | None = None
+        self.nli: NLIScorer | None = None
         self.classifier: HallucinationClassifier | None = None
         self.llm: LLMClient | None = None
         self.pipeline: GuardedRAGPipeline | None = None
@@ -96,21 +96,24 @@ def _build_pipeline(state: AppState, documents: list[dict]) -> None:
         dense_weight=s.retrieval.dense_weight,
         use_dense=False,  # attach dense index below with caching
     )
-    from ..retrieval.dense import DenseIndex
+    if s.retrieval.use_dense:
+        from ..retrieval.dense import DenseIndex
 
-    dense = DenseIndex(s.retrieval.embedding_model, device=s.device)
-    cache = DATA_DIR / "embed_cache.npz"
-    if dense.load_cache(cache):
-        dense.chunks = chunks
-        log.info("Loaded embedding cache from %s", cache.name)
+        dense = DenseIndex(s.retrieval.embedding_model, device=s.device)
+        cache = DATA_DIR / "embed_cache.npz"
+        if dense.load_cache(cache):
+            dense.chunks = chunks
+            log.info("Loaded embedding cache from %s", cache.name)
+        else:
+            log.info("Embedding %d chunks (cached afterwards) ...", len(chunks))
+            dense.index(chunks)
+            try:
+                dense.save_cache(cache)
+            except OSError as e:  # read-only data dir is fine
+                log.warning("Could not write embedding cache: %s", e)
+        retriever.dense = dense
     else:
-        log.info("Embedding %d chunks (cached afterwards) ...", len(chunks))
-        dense.index(chunks)
-        try:
-            dense.save_cache(cache)
-        except OSError as e:  # read-only data dir is fine
-            log.warning("Could not write embedding cache: %s", e)
-    retriever.dense = dense
+        log.info("FG_USE_DENSE=0 — BM25-only retrieval (dense model not loaded)")
     state.pipeline = GuardedRAGPipeline(retriever, state.llm, state.nli, state.classifier, s)
     state.n_chunks = len(chunks)
     state.n_docs = len(documents)
@@ -133,8 +136,8 @@ def create_app(load_default_corpus: bool = True) -> FastAPI:
             )
         if limiter is None:
             log.warning("FG_RATE_LIMIT is not set — rate limiting is DISABLED.")
-        log.info("Registering NLI model %s (lazy load on first use)", state.settings.detection.nli_model)
-        state.nli = LazyNLIScorer(state.settings.detection.nli_model, device=state.settings.device)
+        log.info("Loading NLI model %s ...", state.settings.detection.nli_model)
+        state.nli = NLIScorer(state.settings.detection.nli_model, device=state.settings.device)
         state.classifier = HallucinationClassifier(
             MODELS_DIR / "hallucination_classifier.pkl",
             unsupported_threshold=state.settings.detection.unsupported_claim_threshold,
@@ -178,8 +181,6 @@ def create_app(load_default_corpus: bool = True) -> FastAPI:
         return {
             "status": "ok",
             "version": __version__,
-            # NLI is lazy-loaded on first use; "available" means it is
-            # registered and will load on demand (the real health signal).
             "nli_loaded": state.nli is not None,
             "classifier_loaded": state.classifier is not None,
             "classifier_method": (

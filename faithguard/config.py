@@ -43,6 +43,9 @@ class RetrievalConfig:
     bm25_weight: float = _env_float("FG_BM25_WEIGHT", 1.0)
     dense_weight: float = _env_float("FG_DENSE_WEIGHT", 1.0)
     embedding_model: str = _env("FG_EMBED_MODEL", "BAAI/bge-small-en-v1.5")
+    # Set FG_USE_DENSE=0 on 512 MB hosts (Render free tier): skips the ~240 MB
+    # embedding model and retrieves with BM25 only, leaving headroom for NLI.
+    use_dense: bool = _env("FG_USE_DENSE", "1") not in ("0", "false", "False", "")
 
 
 @dataclass(frozen=True)

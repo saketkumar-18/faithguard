@@ -17,3 +17,6 @@ services:
         sync: false
       - key: FG_LOG_LEVEL
         value: INFO
+      # 512 MB free tier: skip the ~240 MB embedding model, retrieve with BM25.
+      - key: FG_USE_DENSE
+        value: "0"
