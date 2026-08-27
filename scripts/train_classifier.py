@@ -28,8 +28,18 @@ from faithguard.detection.classifier import HallucinationClassifier
 from faithguard.eval.metrics import detection_report
 
 
-def featurize_examples(examples: list[dict], nli: NLIScorer, settings, desc: str) -> tuple[np.ndarray, np.ndarray]:
+def featurize_examples(examples: list[dict], nli: NLIScorer, settings, desc: str,
+                       cache_path: Path | None = None) -> tuple[np.ndarray, np.ndarray]:
+    """Featurize examples via NLI. If cache_path exists, load instead of
+    re-scoring (NLI featurization is the expensive step — ~2h on CPU for
+    900 examples). Cache is keyed by dataset content hash upstream."""
     from tqdm import tqdm
+
+    if cache_path is not None and cache_path.exists():
+        data = np.load(cache_path)
+        print(f"[train] loaded cached features from {cache_path.name} "
+              f"({data['X'].shape[0]} examples)")
+        return data["X"].astype(np.float32), data["y"].astype(np.int64)
 
     X, y = [], []
     for ex in tqdm(examples, desc=desc):
@@ -41,7 +51,12 @@ def featurize_examples(examples: list[dict], nli: NLIScorer, settings, desc: str
         )
         X.append(feats)
         y.append(ex["label"])
-    return np.asarray(X, dtype=np.float32), np.asarray(y, dtype=np.int64)
+    Xa, ya = np.asarray(X, dtype=np.float32), np.asarray(y, dtype=np.int64)
+    if cache_path is not None:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(cache_path, X=Xa, y=ya)
+        print(f"[train] cached features -> {cache_path.name}")
+    return Xa, ya
 
 
 def main():
@@ -68,8 +83,15 @@ def main():
     nli = NLIScorer(settings.detection.nli_model, device=settings.device)
     print(f"[train] NLI model loaded in {time.time()-t0:.1f}s")
 
-    X_train, y_train = featurize_examples(train, nli, settings, "featurize train")
-    X_test, y_test = featurize_examples(test, nli, settings, "featurize test")
+    # feature cache keyed by dataset content (retrain in seconds, not hours)
+    import hashlib
+    ds_hash = hashlib.md5(Path(args.dataset).read_bytes()).hexdigest()[:12]
+    cache_dir = DATA_DIR / "feature_cache"
+    train_cache = cache_dir / f"train_{ds_hash}.npz"
+    test_cache = cache_dir / f"test_{ds_hash}.npz"
+
+    X_train, y_train = featurize_examples(train, nli, settings, "featurize train", train_cache)
+    X_test, y_test = featurize_examples(test, nli, settings, "featurize test", test_cache)
 
     clf = HallucinationClassifier()
     t0 = time.time()
