@@ -102,8 +102,10 @@ class NLIScorer:
         # protobuf graph copy after optimization, saving ~120 MB steady-state
         # RAM on the 512 MB Render free tier. DISABLE_ALL kept both copies
         # resident (373 MB vs 250 MB measured locally).
+        # Enable the CPU memory arena to reduce malloc fragmentation overhead
+        # on the 512 MB cgroup limit.
         sess_opts.enable_mem_pattern = False
-        sess_opts.enable_cpu_mem_arena = False
+        sess_opts.enable_cpu_mem_arena = True
         sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_BASIC
         self.session = ort.InferenceSession(
             paths["onnx/model_quantized.onnx"],
