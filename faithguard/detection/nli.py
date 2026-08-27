@@ -98,12 +98,13 @@ class NLIScorer:
         sess_opts = ort.SessionOptions()
         sess_opts.inter_op_num_threads = 1
         sess_opts.intra_op_num_threads = 1
-        # Minimize peak RAM on 512 MB hosts: no pre-allocated arena, no
-        # mem-pattern cache, and no graph optimization (the optimizer builds
-        # a second copy of the graph in RAM during load).
+        # ORT_ENABLE_BASIC (not DISABLE_ALL): the optimizer frees the raw
+        # protobuf graph copy after optimization, saving ~120 MB steady-state
+        # RAM on the 512 MB Render free tier. DISABLE_ALL kept both copies
+        # resident (373 MB vs 250 MB measured locally).
         sess_opts.enable_mem_pattern = False
         sess_opts.enable_cpu_mem_arena = False
-        sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
+        sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_BASIC
         self.session = ort.InferenceSession(
             paths["onnx/model_quantized.onnx"],
             sess_options=sess_opts,
