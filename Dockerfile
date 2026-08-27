@@ -8,6 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     HF_HOME=/app/hf_models \
+    HF_HUB_OFFLINE=1 \
     HF_HUB_DISABLE_TELEMETRY=1 \
     HF_HUB_DISABLE_IMPLICIT_TOKEN=1 \
     FASTEMBED_CACHE_PATH=/app/hf_models/fastembed \
@@ -27,7 +28,8 @@ RUN pip install -r requirements.txt
 # NLI cross-encoder (quantized int8 ONNX). The embedding model is NOT baked:
 # on the 512 MB free tier we run BM25-only retrieval (FG_USE_DENSE=0), so the
 # ~240 MB fastembed model is never loaded.
-RUN python -c "from huggingface_hub import hf_hub_download; \
+# HF_HUB_OFFLINE=0 overrides the global offline flag for this build step only.
+RUN HF_HUB_OFFLINE=0 python -c "from huggingface_hub import hf_hub_download; \
 [hf_hub_download('Xenova/nli-deberta-v3-small', f) for f in \
  ['onnx/model_quantized.onnx', 'tokenizer.json', 'config.json']]"
 

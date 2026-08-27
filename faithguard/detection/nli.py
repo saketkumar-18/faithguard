@@ -71,7 +71,10 @@ class NLIScorer:
         paths = {}
         for f in _ONNX_FILES:
             local = os.environ.get("FG_NLI_" + Path(f).name.upper().replace(".", "_"))
-            paths[f] = local or hf_hub_download(repo, f)
+            # local_files_only=True: never hit the network at runtime — the
+            # model is baked into the image (HF_HOME). A network call here
+            # was what OOM'd the 512 MB Render free tier.
+            paths[f] = local or hf_hub_download(repo, f, local_files_only=True)
 
         self.tokenizer = Tokenizer.from_file(paths["tokenizer.json"])
         self.tokenizer.enable_truncation(max_length=512)
@@ -91,9 +94,12 @@ class NLIScorer:
         sess_opts.inter_op_num_threads = 1
         sess_opts.intra_op_num_threads = 1
         # Minimize peak RAM on 512 MB hosts: no pre-allocated arena, no
-        # mem-pattern cache. Slightly slower inference, much lower footprint.
+        # mem-pattern cache, and no graph optimization (the optimizer builds
+        # a second copy of the graph in RAM during load — that spike was
+        # enough to trip the OOM killer on the free tier).
         sess_opts.enable_mem_pattern = False
         sess_opts.enable_cpu_mem_arena = False
+        sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
         self.session = ort.InferenceSession(
             paths["onnx/model_quantized.onnx"],
             sess_options=sess_opts,
