@@ -45,3 +45,23 @@ class DenseIndex:
         sims = self._matrix @ q
         order = np.argsort(-sims)[:top_k]
         return [(int(i), float(sims[i])) for i in order]
+
+    # ------------------------------------------------------------- caching
+    def save_cache(self, path) -> None:
+        """Persist the embedding matrix so rebuilds don't re-encode."""
+        from pathlib import Path
+
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if self._matrix is not None:
+            np.savez_compressed(path, matrix=self._matrix)
+
+    def load_cache(self, path) -> bool:
+        from pathlib import Path
+
+        path = Path(path)
+        if not path.exists():
+            return False
+        data = np.load(path)
+        self._matrix = data["matrix"].astype(np.float32)
+        return True

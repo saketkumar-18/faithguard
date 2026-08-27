@@ -72,7 +72,7 @@ class GenerationConfig:
     api_key_env: str = _env("FG_LLM_KEY_ENV", "HERMES_CUSTOM_TOKENROUTER_API_KEY")
     model: str = _env("FG_LLM_MODEL", "qwen/qwen3.8-max-free")
     temperature: float = _env_float("FG_LLM_TEMP", 0.2)
-    max_tokens: int = _env_int("FG_LLM_MAX_TOKENS", 512)
+    max_tokens: int = _env_int("FG_LLM_MAX_TOKENS", 2048)
     timeout_s: float = _env_float("FG_LLM_TIMEOUT", 90.0)
     max_retries: int = _env_int("FG_LLM_RETRIES", 4)
 

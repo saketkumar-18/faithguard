@@ -93,7 +93,14 @@ class LLMClient:
                     continue
                 resp.raise_for_status()
                 data = resp.json()
-                text = data["choices"][0]["message"]["content"].strip()
+                text = (data["choices"][0]["message"]["content"] or "").strip()
+                if not text:
+                    # Reasoning models can burn the whole token budget on
+                    # reasoning and return empty content — retryable.
+                    last_err = "empty_content"
+                    log.warning("LLM returned empty content (attempt %d); retrying", attempt)
+                    time.sleep(1.0 * attempt)
+                    continue
                 return LLMResponse(text=text, model=data.get("model", self.model),
                                    usage=data.get("usage", {}), attempts=attempt)
             except requests.RequestException as e:

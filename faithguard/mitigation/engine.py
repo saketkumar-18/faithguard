@@ -107,6 +107,16 @@ class MitigationEngine:
                     n_passages_final=len(passage_texts),
                 )
             answer = _strip_insufficient(resp.text)
+            if not answer:
+                # model says the re-retrieved context still lacks the answer
+                return MitigationResult(
+                    final_answer=mcfg.abstain_text,
+                    rounds_used=round_no,
+                    abstained=True,
+                    verdicts=verdicts,
+                    queries_used=queries,
+                    n_passages_final=len(passage_texts),
+                )
             passages = passage_texts
             verdict = self.detector(answer, passages, question)
             verdicts.append(verdict)

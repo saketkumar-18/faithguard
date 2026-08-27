@@ -44,14 +44,28 @@ def build_retriever(docs, settings):
     chunker = Chunker(settings.retrieval.chunk_size, settings.retrieval.chunk_overlap)
     chunks = chunker.chunk_documents(docs)
     print(f"[eval] {len(chunks)} chunks from {len(docs)} documents")
-    return HybridRetriever(
+    retriever = HybridRetriever(
         chunks,
         embedding_model=settings.retrieval.embedding_model,
         device=settings.device,
         rrf_k=settings.retrieval.rrf_k,
         bm25_weight=settings.retrieval.bm25_weight,
         dense_weight=settings.retrieval.dense_weight,
+        use_dense=False,  # attach dense index below with caching
     )
+    from faithguard.retrieval.dense import DenseIndex
+
+    cache = DATA_DIR / "embed_cache.npz"
+    dense = DenseIndex(settings.retrieval.embedding_model, device=settings.device)
+    if dense.load_cache(cache):
+        dense.chunks = chunks
+        print(f"[eval] loaded embedding cache from {cache.name}")
+    else:
+        print("[eval] embedding chunks (first run, cached afterwards) ...")
+        dense.index(chunks)
+        dense.save_cache(cache)
+    retriever.dense = dense
+    return retriever
 
 
 def summarize(rows: list[dict]) -> dict:
