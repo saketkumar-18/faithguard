@@ -2,19 +2,18 @@ services:
   - type: web
     name: faithguard
     runtime: docker
-    plan: standard
+    plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
+    autoDeploy: true
     envVars:
       - key: FG_LLM_BASE_URL
         value: https://api.tokenrouter.com/v1
       - key: FG_LLM_MODEL
         value: qwen/qwen3.8-max-free
       - key: FG_LLM_KEY_ENV
-        value: HERMES_CUSTOM_TOKENROUTER_API_KEY
-      - key: HERMES_CUSTOM_TOKENROUTER_API_KEY
+        value: TOKENROUTER_API_KEY
+      - key: TOKENROUTER_API_KEY
         sync: false
-    disk:
-      name: model-cache
-      mountPath: /models-cache
-      sizeGB: 5
+      - key: FG_LOG_LEVEL
+        value: INFO
