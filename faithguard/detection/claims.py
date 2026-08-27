@@ -55,4 +55,12 @@ def extract_claims(answer: str, min_chars: int = 15) -> list[dict]:
                     claims[-1]["hedged"] = claims[-1]["hedged"] or bool(_HEDGE.search(part))
                 continue
             claims.append({"text": part, "hedged": bool(_HEDGE.search(part))})
+    if not claims:
+        # Very short answers ("McCrary", "1976") produce no claims above
+        # min_chars. Fall back to the whole cleaned answer as one claim so
+        # the detector still gets real evidence instead of a degenerate
+        # zero-claim input (which the classifier reads as hallucination).
+        whole = _clean(answer.strip()).strip(" ,;:.")
+        if whole:
+            claims.append({"text": whole, "hedged": bool(_HEDGE.search(whole))})
     return claims
