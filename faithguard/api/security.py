@@ -56,7 +56,11 @@ def require_api_key(request: Request) -> None:
     if expected is None:
         return  # auth disabled (dev)
     provided = _extract_key(request)
-    if not provided or not secrets.compare_digest(provided, expected):
+    # compare_digest on str raises TypeError for non-ASCII — compare UTF-8
+    # bytes instead (still constant-time, works for any key content).
+    if not provided or not secrets.compare_digest(
+        provided.encode("utf-8"), expected.encode("utf-8")
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing API key",

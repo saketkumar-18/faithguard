@@ -148,6 +148,16 @@ class HallucinationClassifier:
             prob = self._rule_probability(claim_scores)
             method = "rules"
 
+        # SAFETY FLOOR: a claim directly contradicted by the context is a
+        # hallucination by definition, whatever the classifier says. The
+        # learned model can be fooled by high lexical overlap ("...in Berlin"
+        # vs "...in Paris" shares 83% of tokens); contradiction is not a
+        # matter of degree. This is a hard production guarantee, not a
+        # learned behavior.
+        if contradicted:
+            prob = max(prob, 0.95)
+            method = method + "+contradiction_floor"
+
         threshold = decision_threshold if decision_threshold is not None else self.decision_threshold
         return AnswerVerdict(
             hallucinated=bool(prob >= threshold),

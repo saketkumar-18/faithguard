@@ -144,3 +144,73 @@ class TestQueryExpansion:
         )
         q = MitigationEngine.expand_query("When was it built?", v)
         assert "1999" in q and "50m" in q
+
+
+# ------------------------------------------------- contradiction safety floor
+class TestContradictionFloor:
+    """A directly-contradicted answer MUST be flagged, whatever the model says.
+
+    Regression: the trained classifier once scored "The Eiffel Tower is in
+    Berlin" at p=0.034 against "The Eiffel Tower is in Paris" because the
+    two sentences share 83% of their tokens. Contradiction is not a matter
+    of degree — the floor makes it a hard guarantee.
+    """
+
+    def _contradicted_score(self):
+        from faithguard.detection.nli import ClaimEvidenceScore
+
+        return ClaimEvidenceScore(
+            claim="The Eiffel Tower is in Berlin.",
+            hedged=False,
+            best_entailment=0.0,
+            best_contradiction=1.0,
+            mean_entailment=0.0,
+            best_passage_idx=0,
+            per_passage_entailment=[0.0],
+            best_neutral=0.0,
+        )
+
+    def test_floor_applies_with_rules_fallback(self):
+        from faithguard.detection.classifier import HallucinationClassifier
+
+        clf = HallucinationClassifier()  # no model -> rules
+        v = clf.verdict("The Eiffel Tower is in Berlin.", [self._contradicted_score()], 1)
+        assert v.hallucinated is True
+        assert v.probability >= 0.95
+        assert "contradiction_floor" in v.method
+
+    def test_floor_overrides_low_model_probability(self):
+        from faithguard.detection.classifier import HallucinationClassifier
+
+        class StubModel:
+            """Pretends the learned model is fooled by lexical overlap."""
+
+            def predict_proba(self, X):
+                import numpy as np
+
+                return np.array([[0.97, 0.03]])  # model says "faithful"
+
+        clf = HallucinationClassifier()
+        clf.model = StubModel()
+        v = clf.verdict("The Eiffel Tower is in Berlin.", [self._contradicted_score()], 1)
+        assert v.hallucinated is True, "contradicted answer must be flagged even if the model disagrees"
+        assert v.probability >= 0.95
+
+    def test_no_floor_when_not_contradicted(self):
+        from faithguard.detection.classifier import HallucinationClassifier
+        from faithguard.detection.nli import ClaimEvidenceScore
+
+        clf = HallucinationClassifier()
+        supported = ClaimEvidenceScore(
+            claim="The Eiffel Tower is in Paris.",
+            hedged=False,
+            best_entailment=0.95,
+            best_contradiction=0.01,
+            mean_entailment=0.9,
+            best_passage_idx=0,
+            per_passage_entailment=[0.95],
+            best_neutral=0.04,
+        )
+        v = clf.verdict("The Eiffel Tower is in Paris.", [supported], 1)
+        assert v.hallucinated is False
+        assert "contradiction_floor" not in v.method
