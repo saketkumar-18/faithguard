@@ -77,6 +77,7 @@ class AppState:
         self.nli: NLIScorer | None = None
         self.classifier: HallucinationClassifier | None = None
         self.llm: LLMClient | None = None
+        self._corpus_path = None  # deferred corpus load (512 MB free tier)
         self.pipeline: GuardedRAGPipeline | None = None
         self.n_chunks = 0
         self.n_docs = 0
@@ -144,13 +145,14 @@ def create_app(load_default_corpus: bool = True) -> FastAPI:
             hallucinated_fraction=state.settings.detection.hallucinated_answer_fraction,
         )
         state.llm = LLMClient.from_settings(state.settings)
+        # Defer corpus loading to first /ask: loading NLI + corpus together
+        # at startup peaks past 512 MB on the Render free tier. Startup now
+        # loads only NLI + classifier (~435 MB); the corpus is built lazily.
         if load_default_corpus:
             corpus_path = DATA_DIR / "corpus.json"
             if corpus_path.exists():
-                import json
-                docs = json.loads(corpus_path.read_text(encoding="utf-8"))
-                _build_pipeline(state, docs)
-                log.info("Corpus loaded: %d docs, %d chunks", state.n_docs, state.n_chunks)
+                state._corpus_path = corpus_path
+                log.info("Corpus deferred to first /ask (%s)", corpus_path.name)
             else:
                 log.warning("No corpus.json found; call POST /corpus/load before /ask")
         log.info("FaithGuard API ready in %.1fs", time.time() - t0)
@@ -213,6 +215,17 @@ def create_app(load_default_corpus: bool = True) -> FastAPI:
 
     @app.post("/ask", dependencies=[Depends(_guard)])
     def ask(req: AskRequest):
+        # Lazy corpus load: deferred from startup to keep the boot peak
+        # under 512 MB on the Render free tier.
+        if state.pipeline is None and state._corpus_path is not None:
+            import gc
+            import json
+            log.info("First /ask — loading corpus from %s ...", state._corpus_path.name)
+            docs = json.loads(state._corpus_path.read_text(encoding="utf-8"))
+            _build_pipeline(state, docs)
+            state._corpus_path = None
+            gc.collect()
+            log.info("Corpus loaded: %d docs, %d chunks", state.n_docs, state.n_chunks)
         if state.pipeline is None:
             raise HTTPException(409, "No corpus loaded. POST /corpus/load first.")
         if not (state.llm and state.llm.api_key):
