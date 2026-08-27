@@ -14,10 +14,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# CPU torch first (small wheel), then the rest
+# Torch-free runtime: ONNX Runtime + fastembed keep the image small and the
+# container under 512 MB RAM (Render free tier).
 COPY requirements.txt .
-RUN pip install --index-url https://download.pytorch.org/whl/cpu torch \
-    && pip install -r requirements.txt
+RUN pip install -r requirements.txt
 
 COPY faithguard ./faithguard
 COPY scripts ./scripts

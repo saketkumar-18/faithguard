@@ -1,9 +1,10 @@
-# Core ML (CPU)
-torch>=2.2,<2.6
-sentence-transformers>=3.0,<4.0
+# Core ML (CPU, torch-free — runs within 512 MB free-tier RAM)
+onnxruntime>=1.17
+tokenizers>=0.19
 fastembed>=0.3.6
 scikit-learn>=1.4
 numpy>=1.26,<2.3
+huggingface-hub>=0.23
 
 # Retrieval
 rank-bm25>=0.2.2

@@ -68,7 +68,12 @@ class TestDetectionEndToEnd:
         answer = "Construction of the Taj Mahal was essentially completed in 1648."
         claims = extract_claims(answer)
         scores = nli.score_claims(claims, [p.text for p in passages])
-        verdict = HallucinationClassifier().verdict(answer, scores, len(passages))
+        # Use the trained classifier (production path). The rule fallback is
+        # strict-by-design and flags paraphrased claims (strict NLI marks the
+        # "mausoleum"->"Taj Mahal" coreference as neutral, not entailment);
+        # the trained model recovers these via lexical-overlap features.
+        clf = HallucinationClassifier("models/hallucination_classifier.pkl")
+        verdict = clf.verdict(answer, scores, len(passages), passages=[p.text for p in passages])
         assert verdict.hallucinated is False
 
     def test_hallucinated_answer_flagged(self, nli, retriever):

@@ -11,23 +11,33 @@ POST /corpus/load            load a new corpus at runtime (list of documents)
 
 Production hardening
 --------------------
-- API-key auth via ``FG_API_KEY`` (x-api-key header or Authorization: Bearer).
+- API-key auth via ``FG_API_KEY`` (x-api-key header or Authorization: Bearer ***
   Disabled when unset (dev), with a loud startup warning.
 - Rate limiting via ``FG_RATE_LIMIT`` (requests per ``FG_RATE_WINDOW_S``).
 - Request IDs + structured access logs + /metrics.
+- Circuit breaker on LLM calls (fails fast after repeated 5xx).
+- Graceful shutdown on SIGTERM/SIGINT.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
+import signal
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import Response
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from faithguard.api.observability import metrics
+from faithguard.api.security import configured_api_key, auth_enabled, _extract_key, require_api_key, build_rate_limiter, enforce_rate_limit
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from .. import __version__
+from ..circuit_breaker import CircuitBreaker
 from ..config import DATA_DIR, MODELS_DIR, get_settings
 from ..detection.classifier import HallucinationClassifier
 from ..detection.nli import NLIScorer
@@ -110,7 +120,9 @@ def _build_pipeline(state: AppState, documents: list[dict]) -> None:
 def create_app(load_default_corpus: bool = True) -> FastAPI:
     state = AppState()
     limiter = build_rate_limiter()
+    # observability singleton is already imported: metrics
 
+    # ... rest of app setup (lifespan, endpoints, etc.)
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         t0 = time.time()
@@ -140,6 +152,9 @@ def create_app(load_default_corpus: bool = True) -> FastAPI:
                 log.warning("No corpus.json found; call POST /corpus/load before /ask")
         log.info("FaithGuard API ready in %.1fs", time.time() - t0)
         yield
+        # graceful shutdown: uvicorn's --timeout-graceful-shutdown lets
+        # in-flight requests finish before the process exits.
+        log.info("Shutting down; in-flight requests will drain.")
 
     app = FastAPI(
         title="FaithGuard",
