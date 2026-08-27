@@ -38,12 +38,12 @@ question ──► hybrid retrieval ──► LLM generation ──► hallucina
 
 | Model | Accuracy | Precision | Recall | F1 | AUC |
 |---|---|---|---|---|---|
-| **FaithGuard classifier** (HistGBM, 15 features) | **0.882** | **0.952** | 0.867 | **0.908** | **0.946** |
-| Rule-based NLI-threshold baseline | 0.651 | 0.662 | 0.973 | 0.788 | 0.478 |
+| **FaithGuard classifier** (HistGBM, 15 features) | **0.856** | **0.930** | 0.847 | **0.887** | **0.948** |
+| Rule-based NLI-threshold baseline | 0.616 | 0.662 | 0.867 | 0.750 | 0.549 |
 
-The learned classifier beats the NLI-threshold heuristic by **+12.0 F1 points** while being far
-more precise (0.952 vs 0.662) — it flags hallucinations without over-triggering mitigation.
-Decision threshold tuned on a validation slice (0.375). Full report: `reports/detection_eval.md`.
+The learned classifier beats the NLI-threshold heuristic by **+13.7 F1 points** while being far
+more precise (0.930 vs 0.662) — it flags hallucinations without over-triggering mitigation.
+Decision threshold tuned on a validation slice (0.50). Full report: `reports/detection_eval.md`.
 
 ### End-to-end faithfulness (baseline RAG vs FaithGuard, 120 held-out questions)
 
