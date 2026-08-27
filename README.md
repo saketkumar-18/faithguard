@@ -47,7 +47,28 @@ Decision threshold tuned on a validation slice (0.50). Full report: `reports/det
 
 ### End-to-end faithfulness (baseline RAG vs FaithGuard, 120 held-out questions)
 
-*(filled in below after `scripts/evaluate_faithfulness.py` completes)*
+| Metric | Baseline RAG | FaithGuard | Delta |
+|---|---|---|---|
+| **Faithfulness** (mean soft support) | 0.497 | **0.620** | **+0.123** |
+| **Claim precision** (fraction of claims supported) | 0.161 | **0.375** | **+0.214** |
+| Answer containment (gold answer present) | 0.867 | 0.783 | −0.083 |
+| Answer correctness (token-F1) | 0.743 | 0.561 | −0.182 |
+| Abstention rate | 0.000 | 0.133 | — |
+| Mean latency (ms) | 6,040 | 21,666 | — |
+
+**Where the gains come from.** On the 46 questions the detector flagged as hallucinated,
+mitigation (claim-guided re-retrieval + corrective regeneration) raised mean faithfulness
+from **0.416 → 0.705**; 30 of 46 were fully repaired and 34/46 ended with faithfulness ≥ 0.5.
+
+**The honest trade-off.** FaithGuard abstains on 13.3% of questions (16/120) when it cannot
+verify an answer after re-retrieval — abstention is faithful by construction but scores 0 on
+correctness. Excluding abstentions, the guarded pipeline actually *improves* answer
+containment (0.885 → 0.904) and faithfulness (0.504 → 0.561). The token-F1 drop is largely a
+metric artifact: the corrective prompt elicits full-sentence answers ("X happened in 1992")
+which token-F1 penalizes against fragment gold answers ("1992") even when the answer is
+present and correct — containment is the fairer measure here.
+
+Full report: `reports/faithfulness_eval.md`.
 
 ## Quickstart
 

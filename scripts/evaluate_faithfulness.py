@@ -28,7 +28,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from faithguard.config import DATA_DIR, MODELS_DIR, REPORTS_DIR, get_settings
 from faithguard.detection.classifier import HallucinationClassifier
 from faithguard.detection.nli import NLIScorer
-from faithguard.eval.metrics import answer_correctness, answer_faithfulness, claim_precision
+from faithguard.eval.metrics import (
+    answer_correctness, answer_containment, answer_faithfulness, claim_precision,
+)
 from faithguard.generation.llm import LLMClient
 from faithguard.pipeline import GuardedRAGPipeline
 from faithguard.retrieval.chunking import Chunker
@@ -74,6 +76,7 @@ def summarize(rows: list[dict]) -> dict:
     return {
         "n": len(rows),
         "mean_correctness": float(np.mean([r["correctness"] for r in rows])),
+        "mean_containment": float(np.mean([r.get("containment", 0.0) for r in rows])),
         "mean_faithfulness": float(np.mean([r["faithfulness"] for r in rows])),
         "mean_claim_precision": float(np.mean([r["claim_precision"] for r in rows])),
         "hallucination_rate": float(np.mean([r["flagged"] for r in rows])),
@@ -151,6 +154,7 @@ def main():
             baseline_rows.append({
                 "id": item["id"], "question": q, "answer": b_answer,
                 "correctness": answer_correctness(b_answer, refs),
+                "containment": answer_containment(b_answer, refs),
                 "faithfulness": answer_faithfulness(b_verdict_claim_scores(b_verdict)),
                 "claim_precision": claim_precision(b_verdict_claim_scores(b_verdict)),
                 "flagged": int(b_verdict.hallucinated),
@@ -170,6 +174,7 @@ def main():
             guarded_rows.append({
                 "id": item["id"], "question": q, "answer": g.answer,
                 "correctness": answer_correctness(g.answer, refs),
+                "containment": answer_containment(g.answer, refs),
                 "faithfulness": g_faith,
                 "claim_precision": g_claim_prec,
                 "flagged": int(g.hallucinated_initial),

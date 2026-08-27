@@ -56,6 +56,7 @@ def faithfulness_md() -> str:
         "|---|---|---|---|",
         f"| Faithfulness (mean soft support) | {b['mean_faithfulness']:.3f} | {g['mean_faithfulness']:.3f} | {gains['faithfulness_delta']:+.3f} |",
         f"| Claim precision (fraction supported) | {b['mean_claim_precision']:.3f} | {g['mean_claim_precision']:.3f} | {gains['claim_precision_delta']:+.3f} |",
+        f"| Answer containment (gold answer present) | {b.get('mean_containment', 0):.3f} | {g.get('mean_containment', 0):.3f} | {gains.get('containment_delta', 0):+.3f} |",
         f"| Answer correctness (token-F1 vs gold) | {b['mean_correctness']:.3f} | {g['mean_correctness']:.3f} | {gains['correctness_delta']:+.3f} |",
         f"| Hallucination rate (flagged) | {b['hallucination_rate']:.3f} | {g['hallucination_rate']:.3f} | {gains['hallucination_rate_delta']:+.3f} |",
         f"| Abstention rate | {b['abstention_rate']:.3f} | {g['abstention_rate']:.3f} | — |",

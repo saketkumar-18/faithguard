@@ -36,6 +36,29 @@ def answer_correctness(prediction: str, references: list[str]) -> float:
     return max(token_f1(prediction, r) for r in references)
 
 
+def answer_containment(prediction: str, references: list[str]) -> float:
+    """1.0 if any reference answer is contained in the prediction (token level).
+
+    Token-F1 unfairly penalizes full-sentence answers ("X happened in 1992")
+    against fragment gold answers ("1992") even when the answer is present
+    and correct. Containment is the fairer measure for extractive QA where
+    the system may answer in complete sentences.
+    """
+    pred = _tokens(prediction)
+    if not pred:
+        return 0.0
+    for ref in references:
+        rt = _tokens(ref)
+        if not rt:
+            continue
+        # sliding-window containment check
+        n = len(rt)
+        for i in range(len(pred) - n + 1):
+            if pred[i : i + n] == rt:
+                return 1.0
+    return 0.0
+
+
 def claim_precision(claim_scores: list) -> float:
     """Faithfulness at claim level: fraction of claims entailed by context."""
     if not claim_scores:
