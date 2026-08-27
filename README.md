@@ -26,7 +26,7 @@ question ──► hybrid retrieval ──► LLM generation ──► hallucina
 | Component | Implementation |
 |---|---|
 | Retrieval | Hybrid BM25 + `BAAI/bge-small-en-v1.5` dense index, fused with Reciprocal Rank Fusion |
-| Detection | Rule-based claim extraction → `cross-encoder/nli-deberta-v3-small` NLI scoring → logistic-regression classifier over 12 interpretable features |
+| Detection | Rule-based claim extraction → `cross-encoder/nli-deberta-v3-small` NLI scoring → gradient-boosting classifier (HistGBM) over 15 interpretable features, threshold tuned on validation |
 | Mitigation | Claim-guided query expansion, re-retrieval with larger top-k, corrective regeneration prompt, re-detection loop, abstention fallback |
 | Generation | Any OpenAI-compatible endpoint (OpenRouter/Tokenrouter/vLLM/Ollama), retries + backoff |
 | Benchmark | SQuAD-derived corpus + **900 labeled detection examples** (faithful vs 4 corruption types) + 120-question held-out QA gold set |
