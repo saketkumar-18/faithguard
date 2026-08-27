@@ -89,7 +89,11 @@ class NLIScorer:
 
         sess_opts = ort.SessionOptions()
         sess_opts.inter_op_num_threads = 1
-        sess_opts.intra_op_num_threads = max(1, (os.cpu_count() or 2) // 2)
+        sess_opts.intra_op_num_threads = 1
+        # Minimize peak RAM on 512 MB hosts: no pre-allocated arena, no
+        # mem-pattern cache. Slightly slower inference, much lower footprint.
+        sess_opts.enable_mem_pattern = False
+        sess_opts.enable_cpu_mem_arena = False
         self.session = ort.InferenceSession(
             paths["onnx/model_quantized.onnx"],
             sess_options=sess_opts,
@@ -167,3 +171,31 @@ def _softmax(x: np.ndarray) -> np.ndarray:
     x = x - x.max(axis=1, keepdims=True)
     e = np.exp(x)
     return e / e.sum(axis=1, keepdims=True)
+
+
+class LazyNLIScorer:
+    """Defers the heavy ONNX NLI session load until first ``score_claims``.
+
+    On a 512 MB host the NLI session alone is ~260 MB, so loading it at
+    startup alongside the embedding model leaves almost no headroom and can
+    trip the OOM killer during the boot/health-check window. This wrapper
+    keeps startup light and loads the model on first real use.
+    """
+
+    def __init__(self, model_name: str = "cross-encoder/nli-deberta-v3-small", device: str = "cpu"):
+        self._model_name = model_name
+        self._device = device
+        self._nli: NLIScorer | None = None
+
+    @property
+    def is_loaded(self) -> bool:
+        return self._nli is not None
+
+    def _load(self) -> NLIScorer:
+        if self._nli is None:
+            log.info("Lazy-loading NLI ONNX model %s ...", self._model_name)
+            self._nli = NLIScorer(self._model_name, device=self._device)
+        return self._nli
+
+    def score_claims(self, claims, passages, batch_size: int = 32):
+        return self._load().score_claims(claims, passages, batch_size=batch_size)

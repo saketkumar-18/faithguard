@@ -1,12 +1,16 @@
 # FaithGuard — Hallucination Detection & Mitigation Engine
-# CPU-only production image. Models are downloaded at first startup and
-# cached in /models-cache (mount a volume there to persist across restarts).
+# CPU-only, torch-free production image. Both ML models are BAKED into the
+# image at build time so there is no runtime download (the ~300 MB download
+# buffer was what OOM'd the 512 MB Render free tier).
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    HF_HOME=/models-cache \
+    HF_HOME=/app/hf_models \
+    HF_HUB_DISABLE_TELEMETRY=1 \
+    HF_HUB_DISABLE_IMPLICIT_TOKEN=1 \
+    FASTEMBED_CACHE_PATH=/app/hf_models/fastembed \
     FAITHGUARD_DATA_DIR=/app/data \
     FAITHGUARD_MODELS_DIR=/app/models \
     # production logging
@@ -18,6 +22,14 @@ WORKDIR /app
 # container under 512 MB RAM (Render free tier).
 COPY requirements.txt .
 RUN pip install -r requirements.txt
+
+# --- bake the ML models into the image (no runtime download) ---------------
+# NLI cross-encoder (quantized int8 ONNX) + bge-small embedding model.
+RUN python -c "from huggingface_hub import hf_hub_download; \
+[hf_hub_download('Xenova/nli-deberta-v3-small', f) for f in \
+ ['onnx/model_quantized.onnx', 'tokenizer.json', 'config.json']]" \
+ && python -c "from fastembed import TextEmbedding; \
+ m = TextEmbedding(model_name='BAAI/bge-small-en-v1.5'); list(m.embed(['warm']))"
 
 COPY faithguard ./faithguard
 COPY scripts ./scripts
@@ -32,8 +44,7 @@ COPY models/*.pkl* ./models/
 # --- security: run as a non-root user -------------------------------------
 RUN groupadd --system faithguard && useradd --system --gid faithguard \
         --home-dir /app --shell /usr/sbin/nologin faithguard \
-    && mkdir -p /models-cache \
-    && chown -R faithguard:faithguard /app /models-cache
+    && chown -R faithguard:faithguard /app
 USER faithguard
 
 EXPOSE 8000
