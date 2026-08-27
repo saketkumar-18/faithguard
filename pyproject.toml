@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "models: tests that download real models (slow, network)",
+]
+addopts = "-m 'not models'"

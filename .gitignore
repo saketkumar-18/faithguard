@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/squad_dev.json
+models/*.pkl
+reports/
+*.egg-info/
+.env
