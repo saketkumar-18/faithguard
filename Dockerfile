@@ -20,8 +20,10 @@ COPY faithguard ./faithguard
 COPY scripts ./scripts
 COPY pyproject.toml .
 
-# Optional: bake the benchmark corpus + trained classifier into the image
+# Optional: bake the benchmark corpus + embedding cache + trained classifier
+# into the image (fast cold starts, no re-embedding)
 COPY data/corpus.json* ./data/
+COPY data/embed_cache.npz* ./data/
 COPY models/*.pkl* ./models/
 
 EXPOSE 8000

@@ -69,7 +69,23 @@ def _build_pipeline(state: AppState, documents: list[dict]) -> None:
         rrf_k=s.retrieval.rrf_k,
         bm25_weight=s.retrieval.bm25_weight,
         dense_weight=s.retrieval.dense_weight,
+        use_dense=False,  # attach dense index below with caching
     )
+    from ..retrieval.dense import DenseIndex
+
+    dense = DenseIndex(s.retrieval.embedding_model, device=s.device)
+    cache = DATA_DIR / "embed_cache.npz"
+    if dense.load_cache(cache):
+        dense.chunks = chunks
+        log.info("Loaded embedding cache from %s", cache.name)
+    else:
+        log.info("Embedding %d chunks (cached afterwards) ...", len(chunks))
+        dense.index(chunks)
+        try:
+            dense.save_cache(cache)
+        except OSError as e:  # read-only data dir is fine
+            log.warning("Could not write embedding cache: %s", e)
+    retriever.dense = dense
     state.pipeline = GuardedRAGPipeline(retriever, state.llm, state.nli, state.classifier, s)
     state.n_chunks = len(chunks)
     state.n_docs = len(documents)
