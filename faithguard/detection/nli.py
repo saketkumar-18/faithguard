@@ -100,8 +100,7 @@ class NLIScorer:
         sess_opts.intra_op_num_threads = 1
         # Minimize peak RAM on 512 MB hosts: no pre-allocated arena, no
         # mem-pattern cache, and no graph optimization (the optimizer builds
-        # a second copy of the graph in RAM during load — that spike was
-        # enough to trip the OOM killer on the free tier).
+        # a second copy of the graph in RAM during load).
         sess_opts.enable_mem_pattern = False
         sess_opts.enable_cpu_mem_arena = False
         sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
