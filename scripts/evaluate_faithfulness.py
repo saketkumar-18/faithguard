@@ -86,6 +86,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=0, help="limit number of questions (0=all)")
     ap.add_argument("--out", default=str(REPORTS_DIR / "faithfulness_eval.json"))
+    ap.add_argument("--sleep", type=float, default=2.0,
+                    help="seconds to sleep between questions (throttle free-tier LLM)")
+    ap.add_argument("--resume", action="store_true", default=True,
+                    help="resume from checkpoint if present")
     args = ap.parse_args()
 
     settings = get_settings()
@@ -112,9 +116,26 @@ def main():
 
     pipeline = GuardedRAGPipeline(retriever, llm, nli, clf, settings)
 
-    baseline_rows, guarded_rows = [], []
+    # ---- checkpoint: resume across crashes / endpoint outages
+    ckpt_path = REPORTS_DIR / "faithfulness_eval.ckpt.json"
+    baseline_rows, guarded_rows, done_ids = [], [], set()
+    if args.resume and ckpt_path.exists():
+        ck = json.loads(ckpt_path.read_text(encoding="utf-8"))
+        baseline_rows = ck.get("baseline_rows", [])
+        guarded_rows = ck.get("guarded_rows", [])
+        done_ids = {r["id"] for r in guarded_rows}
+        print(f"[eval] resumed checkpoint: {len(done_ids)} questions already done")
+
+    def save_ckpt():
+        ckpt_path.write_text(json.dumps(
+            {"baseline_rows": baseline_rows, "guarded_rows": guarded_rows},
+            ensure_ascii=False), encoding="utf-8")
+
     t_start = time.time()
+    n_done_this_run = 0
     for i, item in enumerate(qa_gold, 1):
+        if item["id"] in done_ids:
+            continue
         q = item["question"]
         refs = item["answers"]
         try:
@@ -154,12 +175,17 @@ def main():
                 "p_hallucination": g.hallucination_probability,
                 "latency_ms": g.latency_ms,
             })
+            done_ids.add(item["id"])
+            n_done_this_run += 1
         except Exception as e:  # keep the eval running on individual failures
             print(f"[eval] Q{i} failed: {e}")
             continue
-        if i % 10 == 0:
-            print(f"[eval] {i}/{len(qa_gold)} done "
-                  f"({(time.time()-t_start)/i:.1f}s/q)")
+        save_ckpt()
+        if n_done_this_run % 5 == 0:
+            elapsed = time.time() - t_start
+            print(f"[eval] {len(done_ids)}/{len(qa_gold)} done "
+                  f"({elapsed/max(n_done_this_run,1):.1f}s/q this run)")
+        time.sleep(args.sleep)  # throttle: free-tier endpoint rate limits
 
     base = summarize(baseline_rows)
     guard = summarize(guarded_rows)
@@ -172,6 +198,7 @@ def main():
     }
     out = {
         "n_questions": len(qa_gold),
+        "n_evaluated": len(guarded_rows),
         "baseline": base,
         "guarded": guard,
         "gains": gains,
@@ -188,6 +215,8 @@ def main():
         },
     }
     Path(args.out).write_text(json.dumps(out, indent=1, ensure_ascii=False), encoding="utf-8")
+    if ckpt_path.exists():
+        ckpt_path.unlink()
     print(json.dumps({"baseline": base, "guarded": guard, "gains": gains}, indent=2))
     print(f"[eval] saved {args.out}")
 

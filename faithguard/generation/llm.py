@@ -89,7 +89,11 @@ class LLMClient:
                     continue
                 if resp.status_code >= 500:
                     last_err = f"server_error_{resp.status_code}"
-                    time.sleep(1.5 * attempt)
+                    # exponential backoff for overloaded free-tier endpoints
+                    wait = min(2.0 ** attempt + 1.0, 45.0)
+                    log.warning("LLM %d server error; sleeping %.1fs (attempt %d)",
+                                resp.status_code, wait, attempt)
+                    time.sleep(wait)
                     continue
                 resp.raise_for_status()
                 data = resp.json()
