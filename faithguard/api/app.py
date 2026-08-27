@@ -222,6 +222,9 @@ def create_app(load_default_corpus: bool = True) -> FastAPI:
             import json
             log.info("First /ask — loading corpus from %s ...", state._corpus_path.name)
             docs = json.loads(state._corpus_path.read_text(encoding="utf-8"))
+            if state.settings.retrieval.max_docs > 0:
+                docs = docs[: state.settings.retrieval.max_docs]
+                log.info("FG_MAX_DOCS=%d — corpus capped", state.settings.retrieval.max_docs)
             _build_pipeline(state, docs)
             state._corpus_path = None
             gc.collect()

@@ -39,6 +39,10 @@ class RetrievalConfig:
     chunk_overlap: int = _env_int("FG_CHUNK_OVERLAP", 120)
     top_k: int = _env_int("FG_TOP_K", 5)                       # passages into prompt
     re_top_k: int = _env_int("FG_RE_TOP_K", 8)                 # passages after re-retrieval
+    # Cap the number of corpus documents loaded (0 = no cap). On the 512 MB
+    # Render free tier the full 48-doc corpus + NLI model peaks past the
+    # cgroup limit; capping to ~20 docs keeps steady state under ~460 MB.
+    max_docs: int = _env_int("FG_MAX_DOCS", 0)
     rrf_k: int = 60                                            # Reciprocal Rank Fusion constant
     bm25_weight: float = _env_float("FG_BM25_WEIGHT", 1.0)
     dense_weight: float = _env_float("FG_DENSE_WEIGHT", 1.0)
