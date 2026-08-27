@@ -20,6 +20,7 @@ class ClaimEvidenceScore:
     mean_entailment: float          # mean P(entail) over passages
     best_passage_idx: int           # index of the passage that best supports it
     per_passage_entailment: list[float] = field(default_factory=list)
+    best_neutral: float = 0.0       # P(neutral) at the best-entailing passage
 
     @property
     def supported(self) -> bool:
@@ -28,6 +29,15 @@ class ClaimEvidenceScore:
     @property
     def contradicted(self) -> bool:
         return self.best_contradiction > self.best_entailment and self.best_contradiction >= 0.4
+
+    @property
+    def support(self) -> float:
+        """Soft support in [0,1]: full credit for entailment, half credit for
+        neutral (consistent but not strictly entailed — paraphrase / minor
+        inference). Contradictions get none. NLI cross-encoders are strict:
+        a paraphrased-but-correct claim usually lands in `neutral`, so raw
+        entailment alone saturates at the floor for real RAG answers."""
+        return float(self.best_entailment + 0.5 * self.best_neutral)
 
 
 class NLIScorer:
@@ -60,7 +70,10 @@ class NLIScorer:
                 ClaimEvidenceScore(c["text"], c.get("hedged", False), 0.0, 0.0, 0.0, -1, [0.0] * len(passages))
                 for c in claims
             ]
-        pairs = [(c["text"], p) for c in claims for p in passages]
+        # NLI cross-encoders expect (premise, hypothesis) = (passage, claim).
+        # Reversed order collapses entailment to ~0 (model sees the claim as
+        # the premise) — keep this order!
+        pairs = [(p, c["text"]) for c in claims for p in passages]
         raw = self.model.predict(pairs, batch_size=batch_size, convert_to_numpy=True)
         raw = np.asarray(raw, dtype=np.float32)
         if raw.ndim == 1:  # single pair
@@ -73,6 +86,7 @@ class NLIScorer:
             block = probs[i * n_p : (i + 1) * n_p]
             ent = block[:, self._ent]
             con = block[:, self._con]
+            neu = block[:, self._neu]
             best = int(np.argmax(ent))
             out.append(
                 ClaimEvidenceScore(
@@ -83,6 +97,7 @@ class NLIScorer:
                     mean_entailment=float(ent.mean()),
                     best_passage_idx=best,
                     per_passage_entailment=[float(x) for x in ent],
+                    best_neutral=float(neu[best]),
                 )
             )
         return out

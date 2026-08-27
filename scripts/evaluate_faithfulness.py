@@ -163,11 +163,15 @@ def main():
             g_verdict_scores = [
                 _ScoreProxy(c) for c in g.verdict["claim_details"]
             ]
+            # Abstention asserts nothing about the world -> faithful by
+            # construction (tracked separately via abstention_rate).
+            g_faith = 1.0 if g.abstained else answer_faithfulness(g_verdict_scores)
+            g_claim_prec = 1.0 if g.abstained else claim_precision(g_verdict_scores)
             guarded_rows.append({
                 "id": item["id"], "question": q, "answer": g.answer,
                 "correctness": answer_correctness(g.answer, refs),
-                "faithfulness": answer_faithfulness(g_verdict_scores),
-                "claim_precision": claim_precision(g_verdict_scores),
+                "faithfulness": g_faith,
+                "claim_precision": g_claim_prec,
                 "flagged": int(g.hallucinated_initial),
                 "abstained": int(g.abstained),
                 "mitigated": int(g.mitigated),
@@ -225,8 +229,13 @@ class _ScoreProxy:
     """Adapt stored claim_details dicts back to the metric interface."""
     def __init__(self, d: dict):
         self.best_entailment = d["best_entailment"]
+        self.best_neutral = d.get("best_neutral", 0.0)
         self.supported = d["supported"]
         self.contradicted = d["contradicted"]
+
+    @property
+    def support(self) -> float:
+        return float(self.best_entailment + 0.5 * self.best_neutral)
 
 
 def b_verdict_claim_scores(verdict):

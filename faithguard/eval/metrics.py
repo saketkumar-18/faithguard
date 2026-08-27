@@ -44,14 +44,23 @@ def claim_precision(claim_scores: list) -> float:
 
 
 def answer_faithfulness(claim_scores: list) -> float:
-    """Answer-level faithfulness in [0,1]: mean entailment support across claims.
+    """Answer-level faithfulness in [0,1]: mean soft support across claims.
 
-    Uses the continuous best-entailment score so partial support counts
-    partially — more sensitive than a hard 0/1 for tracking gains.
+    Soft support = P(entailment) + 0.5 * P(neutral): full credit for strict
+    entailment, half credit for claims that are consistent with the context
+    but need paraphrase/minor inference (NLI cross-encoders are strict, so
+    raw entailment alone saturates near zero for real RAG answers).
+    Contradicted claims contribute nothing.
     """
     if not claim_scores:
         return 1.0
-    return float(np.mean([c.best_entailment for c in claim_scores]))
+    vals = []
+    for c in claim_scores:
+        if getattr(c, "contradicted", False):
+            vals.append(0.0)
+        else:
+            vals.append(getattr(c, "support", c.best_entailment))
+    return float(np.mean(vals))
 
 
 def detection_report(y_true: list[int], y_prob: list[float], threshold: float = 0.5) -> dict:

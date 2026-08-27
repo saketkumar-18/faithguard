@@ -163,6 +163,7 @@ class HallucinationClassifier:
                     "claim": c.claim,
                     "best_entailment": round(c.best_entailment, 4),
                     "best_contradiction": round(c.best_contradiction, 4),
+                    "best_neutral": round(getattr(c, "best_neutral", 0.0), 4),
                     "mean_entailment": round(c.mean_entailment, 4),
                     "best_passage_idx": c.best_passage_idx,
                     "hedged": c.hedged,
