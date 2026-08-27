@@ -45,6 +45,11 @@ The learned classifier beats the NLI-threshold heuristic by **+13.7 F1 points** 
 more precise (0.930 vs 0.662) — it flags hallucinations without over-triggering mitigation.
 Decision threshold tuned on a validation slice (0.50). Full report: `reports/detection_eval.md`.
 
+**Contradiction safety floor.** A claim *directly contradicted* by the context is flagged as
+hallucinated (p ≥ 0.95) regardless of the classifier's output. The learned model can be fooled
+by high lexical overlap ("…in Berlin" vs "…in Paris" shares 83% of tokens); contradiction is not
+a matter of degree, so this is a hard production guarantee layered on top of the classifier.
+
 ### End-to-end faithfulness (baseline RAG vs FaithGuard, 120 held-out questions)
 
 | Metric | Baseline RAG | FaithGuard | Delta |
